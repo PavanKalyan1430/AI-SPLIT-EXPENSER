@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from uuid import UUID
 from datetime import datetime, timezone
 import re
@@ -43,6 +44,8 @@ async def upload_csv(
             db=db
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
 
     # Fetch with relationships
@@ -232,9 +235,12 @@ def approve_import(
                 )
                 db.add(payer_mem)
                 db.flush()
-            elif payer_mem.joined_at > expense_date:
-                # Extend joining date back to accommodate expense
-                payer_mem.joined_at = expense_date - timedelta(days=1)
+            else:
+                payer_joined_naive = payer_mem.joined_at.replace(tzinfo=None) if payer_mem.joined_at.tzinfo else payer_mem.joined_at
+                expense_date_naive = expense_date.replace(tzinfo=None) if expense_date.tzinfo else expense_date
+                if payer_joined_naive > expense_date_naive:
+                    # Extend joining date back to accommodate expense
+                    payer_mem.joined_at = expense_date - timedelta(days=1)
 
             # 5. Check if Settlement
             description = str(data.get("description") or "").strip()
@@ -309,9 +315,12 @@ def approve_import(
                     )
                     db.add(p_mem)
                     db.flush()
-                elif p_mem.left_at and p_mem.left_at <= expense_date:
-                    # Inactive member during split: clear their left_at or extend it
-                    p_mem.left_at = None
+                elif p_mem.left_at:
+                    p_left_naive = p_mem.left_at.replace(tzinfo=None) if p_mem.left_at.tzinfo else p_mem.left_at
+                    expense_date_naive = expense_date.replace(tzinfo=None) if expense_date.tzinfo else expense_date
+                    if p_left_naive <= expense_date_naive:
+                        # Inactive member during split: clear their left_at or extend it
+                        p_mem.left_at = None
 
             # 7. Parse splits share values
             split_details_str = str(data.get("split_details") or "").strip()

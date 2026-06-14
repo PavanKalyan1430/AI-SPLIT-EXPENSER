@@ -87,7 +87,13 @@ class InactiveMemberRule(AnomalyRule):
         if expense_date and payer_member:
             joined = payer_member.get("joined_at")
             left = payer_member.get("left_at")
-            if (joined and expense_date < joined) or (left and expense_date >= left):
+            
+            # Normalize to naive for comparison to support SQLite vs Postgres timezone parsing
+            exp_date_naive = expense_date.replace(tzinfo=None) if expense_date.tzinfo else expense_date
+            joined_naive = joined.replace(tzinfo=None) if (joined and joined.tzinfo) else joined
+            left_naive = left.replace(tzinfo=None) if (left and left.tzinfo) else left
+            
+            if (joined_naive and exp_date_naive < joined_naive) or (left_naive and exp_date_naive >= left_naive):
                 return AnomalyResult(
                     anomaly_type="INACTIVE_PAYER",
                     severity="WARNING",
