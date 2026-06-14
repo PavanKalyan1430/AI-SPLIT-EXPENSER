@@ -1,20 +1,19 @@
-# Split Expenser — Enterprise Shared Expense Management & CSV Anomaly Ingestion SaaS
+# Split Expenser — Shared Expense Management with CSV Anomaly Ingestion
 
 ![Split Expenser Banner](assets/split_expenser_banner.png)
 
-Split Expenser is a premium multi-tenant SaaS expense-splitting and debt-reconciliation platform designed for roommates, group trips, and joint business costs. It features a staged **CSV Ingestion Anomaly Resolution Wizard**, a **Date-Aware Historical Roster Engine**, and a **Greedy Min-Flow Debt-Simplification Network Solver**.
+Split Expenser is a shared expense management application designed for roommates, group trips, and shared household costs. It features an interactive **CSV Ingestion Anomaly Resolution Wizard**, a **Date-Aware Historical Roster Engine**, and a **Greedy Min-Flow Debt-Simplification Solver** (Debt Simplification Pathway).
 
 ---
 
-## 🚀 Key Platform Features
+## 🚀 Key Features
 
-- **Staged CSV Ingestion Review Queue**: Raw CSV files are placed in an intermediate database review queue (`import_records` and `anomaly_records`) instead of directly contaminating the group ledger. The client corrects anomalies in the UI before committing data.
-- **Dynamic Anomaly Engine**: Scans every uploaded row against 10 distinct mathematical, syntactic, and relational anomaly rules.
-- **Interactive UI Correction Wizard**: Color-coded row warning states (amber for warnings, red for critical errors, green for valid rows) with on-the-spot drop-down select boxes for mapping unresolved or missing payers.
-- **Historical active timelines**: Member records contain `joined_at` and `left_at` limits. The balance engine automatically checks transaction dates against these intervals, so users are only split into expenses logged while they were active group members.
-- **Auto-Provisioning & Retroactive Joining**: Unregistered users found in the CSV are automatically provisioned with mock profiles (e.g. `dev@split.local`) and retroactively added to the group roster so transaction calculations compile smoothly.
-- **Greedy Min-Flow Network Solver**: Resolves outstanding group obligations, reducing cash transfer transactions from $O(N^2)$ to $O(N)$ matching routes.
-- **PostgreSQL Relational Schema**: Enforces strict referential constraints, cascading delete rules on groups, and delete restriction rules on active users to ensure complete data integrity.
+- **Staged CSV Ingestion Review Wizard**: Raw CSV files are placed in an intermediate database review queue (`import_records` and `anomaly_records`) instead of directly contaminating the ledger. The user corrects data anomalies in a React review wizard before final database insertion.
+- **Dynamic Anomaly Engine**: Scans uploaded CSV rows against mathematical, syntactic, and relational anomaly rules (e.g. missing payers, duplicate transactions, future dates, invalid date formats, and percentage split mismatches).
+- **Roster Timeline Date-Awareness**: Memberships track `joined_at` and `left_at` intervals. When splitting expenses, the balance engine automatically respects these boundaries so members are only charged for transactions occurring while they were active group members.
+- **Auto-Provisioning & Retroactive Joining**: Unregistered users found in the CSV are automatically provisioned with mock profiles and retroactively added to the group roster so transaction calculations compile smoothly.
+- **Greedy Min-Flow Debt Simplification**: A network-flow balance engine that reduces the total transaction count required to settle all debts among group members using sorting and greedy matching algorithms.
+- **PostgreSQL Relational Schema**: Enforces strict database integrity using foreign key constraints, cascading deletes on groups, and delete restriction rules on active users.
 
 ---
 
@@ -34,7 +33,7 @@ Split Expenser is a premium multi-tenant SaaS expense-splitting and debt-reconci
 
 ---
 
-## 🧬 Project Architecture & Layout
+## 🧬 Project Directory Structure
 
 ```
 Split Expenser/
@@ -112,7 +111,7 @@ flowchart TD
 
 ### 2. Active Timeline Roster Logic
 
-Memberships track transaction liability limits using date ranges:
+Group memberships track transaction liability limits using date ranges:
 - **Calculation Window**: A member is only included in an expense's split calculations if:
   $$\text{Expense Date} \ge \text{Membership joined\_at} \quad \text{AND} \quad (\text{Membership left\_at} \text{ is NULL} \quad \text{OR} \quad \text{Expense Date} < \text{Membership left\_at})$$
 - **Mathematical Net Balance Equation**: The net balance $B(i)$ for user $i$ in group $G$ combines direct expenses, split shares, and direct payments:
@@ -272,3 +271,13 @@ py -m pytest
 ### Q4: Why isolate imports in a staged staging area instead of directly writing to the ledger?
 - **Database Contamination**: Importing directly is atomic. If a file has one unrecognized name or typo on row 20, the database transaction must roll back, losing all corrections. If we don't roll back, the database becomes contaminated.
 - **Staging Solution**: Staging saves raw CSV columns in temporary `ImportRecord` rows. This allows the frontend to retrieve the records, run calculations, and allow the user to resolve anomalies (e.g., mapping unrecognized payers) before committing the clean data to the ledger.
+
+### Q5: How do you prevent rounding discrepancies when dividing odd split amounts?
+- **Problem**: Splitting $100$ cents among $3$ users results in $33.333...$ cents. Simply rounding to $33$ cents yields $33 \times 3 = 99$, leaving a $1$ cent discrepancy.
+- **Solution**: We divide using integer division (`amount // n`) and compute the remainder (`amount % n`). We then distribute the remainder cents one-by-one to the first $R$ users:
+  ```python
+  base = amount_cents // n
+  remainder = amount_cents % n
+  calculated_amounts = [base + (1 if i < remainder else 0) for i in range(n)]
+  ```
+  This guarantees that $\sum calculated\_amounts = total\_amount$ exactly.
