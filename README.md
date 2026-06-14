@@ -281,3 +281,36 @@ py -m pytest
   calculated_amounts = [base + (1 if i < remainder else 0) for i in range(n)]
   ```
   This guarantees that $\sum calculated\_amounts = total\_amount$ exactly.
+
+---
+
+## 📊 Solved Tasks & Assignment Specifications
+
+This platform is specifically engineered to address the messy real-world transaction logs and requests from the four roommates:
+
+### 1. Flatmate Requests Resolved
+- **Aisha ("One number per person. Who pays whom, how much, done.")**: 
+  - *Solution*: The **Debt Simplification Pathway** reduces complex multi-party routes using a greedy network flow solver, presenting exactly one simplified repayment route per debtor.
+- **Rohan ("No magic numbers. I want to see exactly which expenses make up my balance.")**:
+  - *Solution*: The **Ledger Feed** prints every single expense item with its total cost and the calculated split share allocations (e.g., `Aisha: 300, Rohan: 150`) printed directly inside the table row.
+- **Priya ("Half the trip was in dollars. The sheet pretends a dollar is a rupee.")**:
+  - *Solution*: The anomaly parser automatically intercepts USD transactions (`FOREIGN_CURRENCY`), converts the amounts using the exchange rate of `83`, and stores the result in INR cents.
+- **Sam ("I moved in mid-April. Why would March electricity affect my balance?")**:
+  - *Solution*: The split calculation is timeline-aware. `calculate_group_balances` filters out member splits if the transaction date falls outside their membership interval (`joined_at` and `left_at`).
+- **Meera ("Clean up the duplicates — but I want to approve anything deleted or changed.")**:
+  - *Solution*: The **Data Validation Wizard** holds imported CSV rows in the database first. Meera can review duplicates (`CSV_DUPLICATE_WARNING` and `DB_DUPLICATE_WARNING`) and selectively decide to **Import** or **Skip Row** before committing.
+
+### 2. Resolution of the 12 Deliberate CSV Data Problems
+- **Missing Payer** (`House cleaning supplies`): Flagged as `MISSING_PAYER`. The wizard displays a selector to map the payer. If approved without mapping, it raises a validation exception, defaulting to the safe `"Unknown Payer"` fallback account.
+- **Name Typos** (`Priya s` instead of Priya): Flagged as `UNRESOLVED_PAYER`. User maps to `Priya` via dropdown.
+- **USD Currency Ingestion** (`Goa villa booking`, `Beach shack lunch`): Flagged as `FOREIGN_CURRENCY` and scaled to INR.
+- **Blank Currency Column** (`Groceries DMart`): Defaulted to `INR`.
+- **Invalid Date Format** (`Airport cab` dated `Mar-14`): Parsed using a fallback regex parser.
+- **Future Dates** (`Deep cleaning service` dated `04-05-2026`): Flagged as `FUTURE_DATE` and warned.
+- **Date Ambiguity** (`04-05-2026`): Flagged as `DATE_AMBIGUITY_WARNING` to warn the user.
+- **Internal CSV Duplicates** (`Dinner at Thalassa` and `Thalassa dinner`): Flagged as `CSV_DUPLICATE_WARNING` allowing the duplicate to be skipped.
+- **External DB Duplicates**: Scanned and flagged against existing database records as `DB_DUPLICATE_WARNING`.
+- **Percentage Totals Mismatch** (`Pizza Friday` sums to 110%): Flagged as `PERCENTAGE_SUM_MISMATCH` and corrected to 100% in UI.
+- **Negative Amounts** (`Parasailing refund`): Flagged as `NEGATIVE_AMOUNT_REFUND` and processed as a refund credit.
+- **Settlement Logged as Expense** (`Rohan paid Aisha back`): Automatically categorized as a Settlement transaction rather than an Expense.
+
