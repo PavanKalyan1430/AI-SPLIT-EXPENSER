@@ -111,3 +111,76 @@ def test_csv_upload_and_approval_integration(client, db):
     assert settlements[0].amount == 50000
     assert settlements[0].from_user_id == bob.id
     assert settlements[0].to_user_id == alice.id
+
+
+def test_csv_approval_validation_errors(client, db):
+    # Seed group and members
+    pw = get_password_hash("password")
+    alice = User(email="alice@test.com", name="Alice", password_hash=pw)
+    db.add(alice)
+    db.flush()
+
+    group = Group(name="Trippers", description="Road trip")
+    db.add(group)
+    db.flush()
+
+    db.add(GroupMembership(group_id=group.id, user_id=alice.id, joined_at=datetime(2026, 1, 1, tzinfo=timezone.utc)))
+    db.commit()
+
+    # Login as Alice
+    login_res = client.post("/api/auth/login", json={
+        "email": "alice@test.com",
+        "password": "password"
+    })
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Upload CSV with empty payer and empty settlement receiver
+    csv_content = (
+        "date,description,paid_by,amount,currency,split_type,split_with,split_details,notes\n"
+        "10-02-2026,Dinner,,3000,INR,equal,Alice,,\n"
+        "14-02-2026,Alice paid back,Alice,500,INR,, ,,\n"
+    )
+
+    file_payload = {
+        "file": ("test_validation.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")
+    }
+
+    upload_res = client.post(
+        f"/api/groups/{group.id}/imports/upload",
+        files=file_payload,
+        headers=headers
+    )
+    assert upload_res.status_code == 200
+    import_data = upload_res.json()
+    import_id = import_data["id"]
+
+    rec1_id = import_data["records"][0]["id"]
+    rec2_id = import_data["records"][1]["id"]
+
+    # Try to approve first row (missing payer) without resolution mapping -> should fail 400
+    resolutions = [
+        {"record_id": rec1_id, "action": "IMPORT", "corrected_data": None},
+        {"record_id": rec2_id, "action": "SKIP", "corrected_data": None}
+    ]
+    approve_res = client.post(
+        f"/api/imports/{import_id}/approve",
+        json={"resolutions": resolutions},
+        headers=headers
+    )
+    assert approve_res.status_code == 400
+    assert "Payer is missing" in approve_res.json()["detail"]
+
+    # Try to approve second row (missing receiver in settlement) without mapping -> should fail 400
+    resolutions = [
+        {"record_id": rec1_id, "action": "SKIP", "corrected_data": None},
+        {"record_id": rec2_id, "action": "IMPORT", "corrected_data": None}
+    ]
+    approve_res = client.post(
+        f"/api/imports/{import_id}/approve",
+        json={"resolutions": resolutions},
+        headers=headers
+    )
+    assert approve_res.status_code == 400
+    assert "Settlement receiver is missing" in approve_res.json()["detail"]
+

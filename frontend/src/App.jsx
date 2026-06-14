@@ -739,7 +739,7 @@ export default function App() {
                                   </div>
 
                                   {/* Custom Correction Options based on detected anomalies */}
-                                  {rec.anomalies.some(a => a.anomaly_type === "UNRESOLVED_PAYER") && (
+                                  {rec.anomalies.some(a => a.anomaly_type === "UNRESOLVED_PAYER" || a.anomaly_type === "MISSING_PAYER") && (
                                     <div className="input-group" style={{ marginBottom: 0 }}>
                                       <label style={{ fontSize: '0.65rem' }}>Map Payer to:</label>
                                       <select 

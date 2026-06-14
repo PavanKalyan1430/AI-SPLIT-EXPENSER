@@ -126,6 +126,16 @@ def approve_import(
     # Internal helper to find/create user by name
     def get_or_create_user(name_str: str) -> User:
         name_clean = name_str.strip().lower()
+        if not name_clean:
+            # Fallback to avoid creating empty user name
+            existing_unknown = db.query(User).filter(User.email == "unknown@split.local").first()
+            if existing_unknown:
+                return existing_unknown
+            new_u = User(email="unknown@split.local", name="Unknown Payer", password_hash="")
+            db.add(new_u)
+            db.flush()
+            return new_u
+
         if name_clean in group_members:
             return group_members[name_clean]
         
@@ -219,7 +229,17 @@ def approve_import(
             payer_uuid_str = data.get("paid_by_user_id")
             if payer_uuid_str:
                 payer_user = db.query(User).filter(User.id == UUID(str(payer_uuid_str))).first()
+                if not payer_user:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Row {rec.row_index + 1}: Selected payer mapping not found in database."
+                    )
             else:
+                if not paid_by_str:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Row {rec.row_index + 1}: Payer is missing. You must map the payer to a valid group member."
+                    )
                 payer_user = get_or_create_user(paid_by_str)
 
             # Ensure payer has membership on expense date (retroactive join if needed)
@@ -258,7 +278,12 @@ def approve_import(
             if is_settlement:
                 # Record as settlement instead of expense
                 # Split with / details will indicate who received it
-                split_with_str = str(data.get("split_with") or "").split(";")[0]
+                split_with_str = str(data.get("split_with") or "").split(";")[0].strip()
+                if not split_with_str:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Row {rec.row_index + 1}: Settlement receiver is missing. You must map the receiver to a valid group member."
+                    )
                 receiver_user = get_or_create_user(split_with_str)
 
                 # Ensure receiver is member
