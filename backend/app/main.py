@@ -1,10 +1,11 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.routers import auth, groups, expenses, settlements, balances, imports
 
-# Auto-create tables on startup (Postgre SQL or SQLite)
+# Auto-create tables on startup (PostgreSQL or SQLite)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -13,10 +14,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration
+# CORS configuration — reads from ALLOWED_ORIGINS env var (comma-separated) or defaults to *
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+if _raw_origins == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For local development, allow all. In prod, scope to frontend origin.
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

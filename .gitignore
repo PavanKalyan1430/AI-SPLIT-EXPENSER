@@ -16,6 +16,11 @@ dist-ssr/
 # Database
 backend/split_expenser.db
 
+# Environment secrets - NEVER commit these
+.env
+backend/.env
+*.env
+
 # OS
 .DS_Store
 Thumbs.db
