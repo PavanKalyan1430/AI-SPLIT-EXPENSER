@@ -6,6 +6,31 @@ Split Expenser is a shared expense management application designed for roommates
 
 ---
 
+## 🤖 AI Tools Used in Development
+
+This project was built with the assistance of the following AI tools:
+
+| AI Tool | Role in Development |
+| :--- | :--- |
+| **Claude (Anthropic)** | Architecture design, backend logic, anomaly detection engine, API routing, test writing, debugging, and code review |
+| **Gemini (Google DeepMind)** | Frontend UI design & React component generation, deployment automation (Vercel + Render), environment configuration |
+
+> Both AI tools were used as pair-programming assistants — all design decisions, logic validation, and final review were performed by the developer.
+
+---
+
+## 🌐 Live Deployment
+
+| Service | URL |
+| :--- | :--- |
+| **Frontend (Vercel)** | https://frontend-two-sooty-11.vercel.app |
+| **Backend API (Render)** | https://split-expenser-backend.onrender.com |
+| **API Docs (Swagger)** | https://split-expenser-backend.onrender.com/docs |
+
+> **Note:** The Render backend is on a free tier — it may take **30–60 seconds** to wake up on the first request after a period of inactivity.
+
+---
+
 ## 🚀 Key Features
 
 - **Staged CSV Ingestion Review Wizard**: Raw CSV files are placed in an intermediate database review queue (`import_records` and `anomaly_records`) instead of directly contaminating the ledger. The user corrects data anomalies in a React review wizard before final database insertion.
